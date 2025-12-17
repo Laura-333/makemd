@@ -37,6 +37,9 @@ import { createPortal } from "react-dom";
 import { DBRow, SpaceProperty } from "shared/types/mdb";
 import { uniq } from "shared/utils/array";
 import { ColumnHeader } from "./ColumnHeader";
+import { TableHeader } from "./TableHeader";
+import { TableBody } from "./TableBody";
+import { TableFooter } from "./TableFooter";
 
 import classNames from "classnames";
 import { showRowContextMenu } from "core/react/components/UI/Menus/contexts/rowContextMenu";
@@ -589,288 +592,64 @@ export const TableView = (props: { superstate: Superstate }) => {
         onKeyDown={onKeyDown}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <table
-          {
-            ...{
-              // style: {
-              //   width: table.getTotalSize(),
-              // },
+        <div className="mk-grid">
+          {/* Header Section */}
+          <TableHeader
+            superstate={props.superstate}
+            cols={cols}
+            colsSize={colsSize}
+            dbSchema={dbSchema}
+            readMode={readMode}
+            activeId={activeId}
+            table={table}
+            onResizeHandler={(handler) => handler}
+          />
+
+          {/* Body Section */}
+          <TableBody
+            superstate={props.superstate}
+            cols={cols}
+            colsSize={colsSize}
+            data={data}
+            contextTable={contextTable}
+            readMode={readMode}
+            selectedRows={selectedRows}
+            selectedColumn={selectedColumn}
+            currentEdit={currentEdit}
+            table={table}
+            onSelectCell={selectCell}
+            onContextMenu={(e, rowIndex) => {
+              showRowContextMenu(
+                e,
+                props.superstate,
+                spaceCache.path,
+                dbSchema.id,
+                rowIndex
+              );
+            }}
+            updateValue={updateValue}
+            updateFieldValue={updateFieldValue}
+            setCurrentEdit={setCurrentEdit}
+            setSelectedColumn={setSelectedColumn}
+          />
+
+          {/* Footer Section */}
+          <TableFooter
+            superstate={props.superstate}
+            cols={cols}
+            colsSize={colsSize}
+            data={data}
+            groupBy={groupBy}
+            readMode={readMode}
+            predicate={predicate}
+            pageSize={pageSize}
+            onLoadMore={() =>
+              table.setPageSize(pagination.pageSize + pageSize)
             }
-          }
-        >
-          <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                <th></th>
-                {headerGroup.headers.map((header) => (
-                  <th
-                    className="mk-th"
-                    key={header.id}
-                    style={{
-                      minWidth: header.column.getIsGrouped()
-                        ? "0px"
-                        : // @ts-ignore
-                          colsSize[header.column.columnDef.accessorKey] ??
-                          "150px",
-                      maxWidth: header.column.getIsGrouped()
-                        ? "0px"
-                        : // @ts-ignore
-                          colsSize[header.column.columnDef.accessorKey] ??
-                          "150px",
-                    }}
-                  >
-                    {header.isPlaceholder ? null : header.column.columnDef
-                        .header != "+" ? (
-                      header.column.getIsGrouped() ? (
-                        <></>
-                      ) : (
-                        <ColumnHeader
-                          superstate={props.superstate}
-                          editable={
-                            !readMode && header.column.columnDef.meta.editable
-                          }
-                          column={cols.find(
-                            (f) =>
-                              f.name == header.column.columnDef.header &&
-                              f.table == header.column.columnDef.meta.table
-                          )}
-                        ></ColumnHeader>
-                      )
-                    ) : (
-                      <ColumnHeader
-                        superstate={props.superstate}
-                        isNew={true}
-                        editable={true}
-                        column={{
-                          name: "",
-                          schemaId: header.column.columnDef.meta.schemaId,
-                          type: "text",
-                          table: "",
-                        }}
-                      ></ColumnHeader>
-                    )}
-                    <div
-                      {...{
-                        onMouseDown: header.getResizeHandler(),
-                        onTouchStart: header.getResizeHandler(),
-                        className: `mk-resizer ${
-                          header.column.getIsResizing() ? "isResizing" : ""
-                        }`,
-                      }}
-                    />
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr
-                className={
-                  selectedRows?.some(
-                    (f) => f == (data[row.index] as DBRow)["_index"]
-                  )
-                    ? "mk-active"
-                    : undefined
-                }
-                onContextMenu={(e) => {
-                  const rowIndex = parseInt(
-                    (data[row.index] as DBRow)["_index"]
-                  );
-                  showRowContextMenu(
-                    e,
-                    props.superstate,
-                    spaceCache.path,
-                    dbSchema.id,
-                    rowIndex
-                  );
-                }}
-                key={row.id}
-              >
-                <td></td>
-                {row.getVisibleCells().map((cell, i) =>
-                  cell.getIsGrouped() ? (
-                    // If it's a grouped cell, add an expander and row count
-                    <td
-                      key={i}
-                      className="mk-td-group"
-                      colSpan={cols.length + (readMode ? 0 : 1)}
-                    >
-                      <div
-                        {...{
-                          onClick: row.getToggleExpandedHandler(),
-                          style: {
-                            display: "flex",
-                            alignItems: "center",
-                            cursor: "normal",
-                          },
-                        }}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}{" "}
-                        ({row.subRows.length})
-                      </div>
-                    </td>
-                  ) : cell.getIsAggregated() ? (
-                    // If the cell is aggregated, use the Aggregated
-                    // renderer for cell
-                    <React.Fragment key={i}>
-                      {flexRender(
-                        cell.column.columnDef.aggregatedCell ??
-                          cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </React.Fragment>
-                  ) : (
-                    <td
-                      onClick={(e) =>
-                        selectCell(
-                          e,
-                          cell.row.index,
-                          // @ts-ignore
-                          cell.column.columnDef.accessorKey
-                        )
-                      }
-                      className={`${
-                        // @ts-ignore
-                        cell.column.columnDef.accessorKey == selectedColumn
-                          ? "mk-selected-cell "
-                          : ""
-                      } mk-td ${cell.getIsPlaceholder() ? "mk-td-empty" : ""}`}
-                      key={cell.id}
-                      style={{
-                        minWidth: cell.getIsPlaceholder()
-                          ? "0px"
-                          : // @ts-ignore
-                            colsSize[cell.column.columnDef.accessorKey] ??
-                            "50px",
-                        maxWidth: cell.getIsPlaceholder()
-                          ? "0px"
-                          : // @ts-ignore
-                            colsSize[cell.column.columnDef.accessorKey] ??
-                            "unset",
-                      }}
-                    >
-                      {cell.getIsPlaceholder()
-                        ? null
-                        : flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                    </td>
-                  )
-                )}
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            {table.getCanNextPage() && (
-              <tr>
-                <th
-                  className="mk-row-new"
-                  colSpan={cols.length + (readMode ? 1 : 2)}
-                  onClick={() =>
-                    table.setPageSize(pagination.pageSize + pageSize)
-                  }
-                >
-                  {i18n.buttons.loadMore}
-                </th>
-              </tr>
-            )}
-            {!readMode ? (
-              <tr>
-                <th
-                  className="mk-row-new"
-                  colSpan={cols.length + (readMode ? 1 : 2)}
-                  data-placeholder={i18n.hintText.newItem}
-                  onFocus={(e) => {
-                    setSelectedColumn(null);
-                    setLastSelectedIndex(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key == "Enter") {
-                      newRow(e.currentTarget.innerText);
-                      e.currentTarget.innerText = "";
-                      e.preventDefault();
-                    }
-                  }}
-                  contentEditable={true}
-                ></th>
-              </tr>
-            ) : (
-              <></>
-            )}
-            <tr>
-              <td></td>
-              {groupBy.map((f, i) => (
-                <td key={i}></td>
-              ))}
-              {(groupBy.length > 0
-                ? cols.filter((f) => !groupBy.includes(f.name))
-                : cols
-              ).map((col, i) => (
-                <td
-                  key={i}
-                  className={classNames(
-                    "mk-td-aggregate",
-                    !predicate.colsCalc[col.name] && "mk-empty"
-                  )}
-                  onClick={(e) => {
-                    const options: SelectOption[] = [];
-                    options.push({
-                      name: i18n.labels.none,
-                      value: "",
-                      onClick: () => {
-                        saveAggregate(col.name, null);
-                      },
-                    });
-                    Object.keys(aggregateFnTypes).forEach((f) => {
-                      if (
-                        aggregateFnTypes[f].type == fieldTypeForField(col) ||
-                        aggregateFnTypes[f].type == "any" ||
-                        col.type == "flex"
-                      )
-                        options.push({
-                          name: i18n.aggregates[f],
-                          value: f,
-                          onClick: () => {
-                            saveAggregate(col.name, f);
-                          },
-                        });
-                    });
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    props.superstate.ui.openMenu(
-                      rect,
-                      defaultMenu(props.superstate.ui, options),
-                      windowFromDocument(e.view.document)
-                    );
-                  }}
-                >
-                  {predicate.colsCalc[col.name]?.length > 0 ? (
-                    <div>
-                      <span>
-                        {i18n.aggregates[predicate.colsCalc[col.name]]}
-                      </span>
-                      {valueForAggregate(
-                        aggregateValues[col.name],
-                        aggregateFnTypes[predicate.colsCalc[col.name]]
-                          .valueType,
-                        col
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <span>{i18n.labels.calculate}</span>
-                    </div>
-                  )}
-                </td>
-              ))}
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
+            onNewRow={newRow}
+            onSaveAggregate={saveAggregate}
+          />
+        </div>
 
         {createPortal(
           <DragOverlay dropAnimation={null} zIndex={1600}>

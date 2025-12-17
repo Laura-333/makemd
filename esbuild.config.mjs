@@ -158,7 +158,7 @@ esbuild.build({
 	watch: !buildv,
 	target: 'es2020',
 	logLevel: "info",
-	sourcemap: buildv ? false : 'inline',
+	sourcemap: true,
 	treeShaking: true,
   minify: true,
 	outfile: outputDir+'/main.js',
